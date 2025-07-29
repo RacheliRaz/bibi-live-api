@@ -3,27 +3,28 @@ import requests
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return jsonify({"status": "API is live!"})
-
 @app.route('/price')
 def get_price():
+    url = "https://api.dexscreener.com/latest/dex/pairs/ethereum/0xfA21cc13462fD156a2d11EB7b5c4812154C6f485"
+    
     try:
-        url = "https://api.dexscreener.com/latest/dex/pairs/ethereum/0x6Def1C8560552E589c3912391C4f5ed72c4625d4"
         response = requests.get(url)
-        data = response.json().get('pair', {})
+        if response.status_code != 200:
+            return jsonify({"error": f"API returned status code {response.status_code}"}), 500
 
-        return jsonify({
-            "symbol": data.get("baseToken", {}).get("symbol", "N/A"),
-            "price_usd": data.get("priceUsd", "N/A"),
-            "volume_24h": data.get("volume", "N/A"),
-            "liquidity_usd": data.get("liquidity", {}).get("usd", "N/A"),
-            "market_cap": "N/A",  # נתון חסר ב-DexScreener
-            "holders": "N/A",     # צריך למשוך מ-Etherscan
-        })
+        data = response.json()
+        if data is None or "pair" not in data:
+            return jsonify({"error": "API response invalid or missing 'pair'"}), 500
+
+        pair_data = data.get("pair", {})
+        
+        result = {
+            "priceUsd": pair_data.get("priceUsd"),
+            "marketCap": pair_data.get("fdv"),
+            "liquidity": pair_data.get("liquidity", {}).get("usd"),
+            "volume24h": pair_data.get("volume", {}).get("h24")
+        }
+        return jsonify(result)
+
     except Exception as e:
-        return jsonify({"error": str(e)})
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        return jsonify({"error": str(e)}), 500
